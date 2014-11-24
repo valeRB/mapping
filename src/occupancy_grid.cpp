@@ -5,7 +5,7 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "vector"
 #include "geometry_msgs/PoseStamped.h"
-#include "transforms/IrTransformMsg.h"
+//#include "transforms/IrTransformMsg.h"
 
 class OccupancyGrid
 {
@@ -39,7 +39,7 @@ public:
         occupancy_grid_ = new OccupancyGrid();
         // Subscribers:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
-        sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
+        //sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
         //pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
@@ -154,12 +154,15 @@ public:
 
     }*/
 
+    /*
+
     void sensorCallback(const transforms::IrTransformMsg::ConstPtr &sensor_msg)
     {
         //Only if the measurement is valid will we get the points
         bool s1=sensor_msg->s1;
 
     }
+    */
 
     void gridVisualize()
     {
