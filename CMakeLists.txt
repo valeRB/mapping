@@ -4,6 +4,7 @@ project(mapping)
 ## Find catkin and any catkin packages
 find_package(catkin REQUIRED COMPONENTS 
   roscpp 
+  tf
 #  genmsg
 )
 

@@ -6,6 +6,7 @@
 #include "vector"
 #include "geometry_msgs/PoseStamped.h"
 #include "transforms/IrTransformMsg.h"
+#include "tf/transform_listener.h"
 
 class OccupancyGrid
 {
@@ -21,23 +22,26 @@ public:
     int width_robot, height_robot; //[cell], preferably even number
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
+    transforms::IrTransformMsg sensor_msg;
+    tf::TransformListener listener;
+
     std::vector<signed char> map_vector;
 
 
     OccupancyGrid()
     {
-        n = ros::NodeHandle("~");
-        occupancy_grid_ = NULL;
+        n = ros::NodeHandle();
+        //occupancy_grid_ = NULL;
     }
 
     ~OccupancyGrid()
     {
-        delete occupancy_grid_;
+        //delete occupancy_grid_;
     }
 
     void init()
     {
-        occupancy_grid_ = new OccupancyGrid();
+        //occupancy_grid_ = new OccupancyGrid();
         // Subscribers:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
@@ -57,8 +61,9 @@ public:
         y_pose_cell_map = floor((center_y - y_t)/resolution);
         // Initial values of previous values != than zero
 
-        width_robot=4;
-        height_robot=4;
+        width_robot=10; //[cell]
+        height_robot=10; //[cell]
+
         if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
         {
             for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
@@ -66,23 +71,37 @@ public:
                 for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
                 {
                     map_vector[i*width_map+j] = 0;
-                    ROS_INFO("IN FOR LOOP");
+
                 }
             }
             prev_x_pose_cell = x_pose_cell_map;
             prev_y_pose_cell = y_pose_cell_map;
         }
 
-
         // 2. Check if sensors are giving measurements
-        // 3. Update cell that has been sensed and in between cells
-        /*
-        if (s1==true)
+        if(sensor_msg.s1 == true)
         {
-            mapUpdate(sensor_msg->p1.point.x, sensor_msg->p1.point.y,
-                      x_t, y_t, theta_t, );
-         }
-        */
+            mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
+        }
+
+        if(sensor_msg.s2 == true)
+        {
+            mapUpdate(sensor_msg.p2.point.x,sensor_msg.p2.point.y,2);
+        }
+
+        if(sensor_msg.s3 == true)
+        {
+            //mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
+        }
+
+        if(sensor_msg.s4 == true)
+        {
+            //mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
+        }
+
+
+        // 3. Update cell that has been sensed and in between cells
+
         /*
         In case we want to view our direction
         //Publish pose for visualization
@@ -105,10 +124,11 @@ public:
 
     void mapInit()
     {
-        width_map=200; //[cell]
-        height_map=200; //[cell]
+        // Map set to be 10mx10m
+        width_map=500; //[cell]
+        height_map=500; //[cell]
         int cellNumber=width_map*height_map;
-        resolution = 0.05; //[m/cell]
+        resolution = 0.02; //[m/cell]
         map_vector = std::vector<signed char>(cellNumber,-1);
         center_x = width_map/2 * resolution; //[m]
         center_y = width_map/2 * resolution; //[m]
@@ -117,50 +137,121 @@ public:
     }
 
     // Function needs working on
-    /*void mapUpdate(double x_sens_dist, double y_sens_dist, double x_pose, double y_pose, double theta_pose)
+    void mapUpdate(double x_sens_dist, double y_sens_dist, int sensor)
     {
+
         //x_sens_dist and y_sens_dist are distance from robot to detected object.
         // Always start at center of grid: add/subtract to center_x to all distances
         // according to sign conventions.
         // First, convert sensor readings from robot frame to map frame then and then convert
-        // --- obtain X coordenate of cells ---
-        double x_sensed_dist_pose = x_sens_dist * cos(theta_pose);
-        double x_pose_dist_map = center_x + x_pose; //add center for x
-        double x_sensed_dist_map = x_pose_dist_map + x_sensed_dist_pose;
-        int x_pose_cell = floor(x_pose_dist_map/resolution);
-        int x_sensed_cell = floor(x_sensed_dist_map/resolution);
 
-        // --- obtain Y coordenate of cells ---
-        double y_sensed_dist_pose = y_sens_dist * sin(theta_pose);
-        double y_pose_dist_map = center_y - y_pose; //add center for x
-        double y_sensed_dist_map = y_pose_dist_map - y_sensed_dist_pose;
-        int y_pose_cell = floor(y_pose_dist_map/resolution);
-        int y_sensed_cell = floor(y_sensed_dist_map/resolution);
+        int x_sens_cell = floor(x_sens_dist/resolution);
+        int y_sens_cell = floor(y_sens_dist/resolution);
+        double corner_x, corner_y;
+        int corner_x_cell, corner_y_cell;
+        tf::StampedTransform transform;
+        switch(sensor)
+        {
+            case 1:
+            try
+            {
+                listener.waitForTransform("/sensor1", "/map", ros::Time(0), ros::Duration(1));
+                listener.lookupTransform("/map", "/sensor1", ros::Time(0), transform);
+                corner_x = transform.getOrigin().getX();
+                corner_y = transform.getOrigin().getY();
+                corner_x_cell = floor(corner_x/resolution);
+                corner_y_cell = floor(corner_y/resolution);
+            }
+                catch(tf::TransformException ex)
+                {
+                    ROS_ERROR("%s",ex.what());
+                }
+            break;
+
+
+            case 2:
+            try
+            {
+                listener.waitForTransform("/sensor2", "/map", ros::Time(0), ros::Duration(1));
+                listener.lookupTransform("/map", "/sensor2", ros::Time(0), transform);
+                corner_x = transform.getOrigin().getX();
+                corner_y = transform.getOrigin().getY();
+                corner_x_cell = floor(corner_x/resolution);
+                corner_y_cell = floor(corner_y/resolution);
+            }
+                catch(tf::TransformException ex)
+            {
+                    ROS_ERROR("%s",ex.what());
+            }
+            break;
+
+            case 3:
+            try
+            {
+                listener.waitForTransform("/sensor3", "/map", ros::Time(0), ros::Duration(1));
+                listener.lookupTransform("/map", "/sensor3", ros::Time(0), transform);
+                corner_x = transform.getOrigin().getX();
+                corner_y = transform.getOrigin().getY();
+                corner_x_cell = floor(corner_x/resolution);
+                corner_y_cell = floor(corner_y/resolution);
+            }
+                catch(tf::TransformException ex)
+            {
+                    ROS_ERROR("%s",ex.what());
+            }
+            break;
+
+            case 4:
+            try
+            {
+                listener.waitForTransform("/sensor4", "/map", ros::Time(0), ros::Duration(1));
+                listener.lookupTransform("/map", "/sensor4", ros::Time(0), transform);
+                corner_x = transform.getOrigin().getX();
+                corner_y = transform.getOrigin().getY();
+                corner_x_cell = floor(corner_x/resolution);
+                corner_y_cell = floor(corner_y/resolution);
+            }
+                catch(tf::TransformException ex)
+            {
+                    ROS_ERROR("%s",ex.what());
+            }
+
+        }
+        //ROS_INFO("Corner X %d", corner_x);
+        //ROS_INFO("Corner Y %d", corner_y);
+
+        map_vector[x_sens_cell*width_map + y_sens_cell]=100;
+        /*
+        for(int i = corner_x_cell ; i <= x_sens_cell; i++)
+        {
+            for(int j = corner_y_cell ; j<= y_sens_cell; j++)
+            {
+
+                if((i==x_sens_cell) && (j==y_sens_cell))
+                    map_vector[i*width_map+j] = 100;
+                else
+                {
+                    map_vector[i*width_map+j] = 0;
+
+                }
+
+
+            }
+        }
+*/
+
 
         // Fill all cells between pose cell and sensed cell with 0 or +1;
         // needs working on
-        int j=0;
-        for(int i = x_pose_cell; i <= x_sensed_cell; i++)
-        {
-            if((i!=x_sensed_cell))
-            {
-                //We will only set cells to 0 that are unseen
-                if(map_vector[i*width_map+(j+y_pose_cell)]==-1)
-                    map_vector[i*width_map+(j+y_pose_cell)]=0;
-                j++;
-            }
-            else
-            {
-                map_vector[i*width_map+(j+y_pose_cell)] = map_vector[i*width_map+(j+y_pose_cell)] + 1;
-            }
-        }
 
-    }*/
 
-    void sensorCallback(const transforms::IrTransformMsg::ConstPtr &sensor_msg)
+    }
+
+    void sensorCallback(const transforms::IrTransformMsg &msg)
     {
         //Only if the measurement is valid will we get the points
-        bool s1=sensor_msg->s1;
+
+        sensor_msg = msg;
 
     }
 
@@ -201,7 +292,7 @@ public:
 
 private:
 
-    OccupancyGrid *occupancy_grid_;
+    //OccupancyGrid *occupancy_grid_;
 
 
 };
@@ -213,7 +304,7 @@ int main(int argc, char **argv)
     OccupancyGrid map;
     map.init();
     map.mapInit();
-    ros::Rate loop_rate(10.0);
+    ros::Rate loop_rate(20.0);
 
     while(map.n.ok())
     {
