@@ -57,8 +57,8 @@ public:
         y_pose_cell_map = floor((center_y - y_t)/resolution);
         // Initial values of previous values != than zero
 
-        //width_robot=4;
-        //height_robot=4;
+        width_robot=4;
+        height_robot=4;
         if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
         {
             for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
@@ -66,6 +66,7 @@ public:
                 for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
                 {
                     map_vector[i*width_map+j] = 0;
+                    ROS_INFO("IN FOR LOOP");
                 }
             }
             prev_x_pose_cell = x_pose_cell_map;
