@@ -20,6 +20,7 @@ public:
     double resolution, center_x, center_y;
     int width_robot, height_robot; //[cell], preferably even number
     int x_pose_cell_map, y_pose_cell_map;
+    int prev_x_pose_cell, prev_y_pose_cell;
     std::vector<signed char> map_vector;
 
 
@@ -55,8 +56,7 @@ public:
         x_pose_cell_map = floor((center_x + x_t)/resolution);
         y_pose_cell_map = floor((center_y - y_t)/resolution);
         // Initial values of previous values != than zero
-        int prev_x_pose_cell=1000;
-        int prev_y_pose_cell=1000;
+
         //width_robot=4;
         //height_robot=4;
         if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
@@ -111,6 +111,8 @@ public:
         map_vector = std::vector<signed char>(cellNumber,-1);
         center_x = width_map/2 * resolution; //[m]
         center_y = width_map/2 * resolution; //[m]
+        prev_x_pose_cell=1000;
+        prev_y_pose_cell=1000;
     }
 
     // Function needs working on
