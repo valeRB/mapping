@@ -7,6 +7,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "transforms/IrTransformMsg.h"
 #include "tf/transform_listener.h"
+#include "std_msgs/Bool.h"
 
 class OccupancyGrid
 {
@@ -15,6 +16,7 @@ public:
     ros::Subscriber odometry_subscriber;
     ros::Subscriber sensor_subscriber;
     ros::Publisher occupancy_publisher;
+    ros::Subscriber turn_sub;
     //ros::Publisher pose_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
@@ -22,6 +24,7 @@ public:
     int width_robot, height_robot; //[cell], preferably even number
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
+    std_msgs::Bool turning;
     transforms::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
 
@@ -48,6 +51,7 @@ public:
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
         //pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
+        turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
     }
 
 
@@ -58,7 +62,7 @@ public:
         theta_t = pose_msg->theta;
         // 1. Update map every time we move to another cell
         x_pose_cell_map = floor((center_x + x_t)/resolution);
-        y_pose_cell_map = floor((center_y - y_t)/resolution);
+        y_pose_cell_map = floor((center_y + y_t)/resolution);
         // Initial values of previous values != than zero
 
         width_robot=10; //[cell]
@@ -70,7 +74,7 @@ public:
             {
                 for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
                 {
-                    map_vector[i*width_map+j] = 0;
+                    map_vector[i+width_map*j] = 0;
 
                 }
             }
@@ -79,26 +83,27 @@ public:
         }
 
         // 2. Check if sensors are giving measurements
-        if(sensor_msg.s1 == true)
-        {
-            mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
-        }
+        if (turning.data == false) {
+            if(sensor_msg.s1 == true)
+            {
+                mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
+            }
 
-        if(sensor_msg.s2 == true)
-        {
-            mapUpdate(sensor_msg.p2.point.x,sensor_msg.p2.point.y,2);
-        }
+            if(sensor_msg.s2 == true)
+            {
+                mapUpdate(sensor_msg.p2.point.x,sensor_msg.p2.point.y,2);
+            }
 
-        if(sensor_msg.s3 == true)
-        {
-            //mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
-        }
+            if(sensor_msg.s3 == true)
+            {
+                mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
+            }
 
-        if(sensor_msg.s4 == true)
-        {
-            //mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
+            if(sensor_msg.s4 == true)
+            {
+                mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
+            }
         }
-
 
         // 3. Update cell that has been sensed and in between cells
 
@@ -120,6 +125,10 @@ public:
         */
         // Estimate cells to update here
 
+    }
+
+    void turnCallback(const std_msgs::Bool &msg) {
+        turning = msg;
     }
 
     void mapInit()
@@ -217,28 +226,44 @@ public:
             }
 
         }
-        //ROS_INFO("Corner X %d", corner_x);
-        //ROS_INFO("Corner Y %d", corner_y);
+        ROS_INFO("Corner X %f", corner_x);
+        ROS_INFO("Corner Y %f", corner_y);
+        ROS_INFO("Wall X %f", x_sens_dist);
+        ROS_INFO("Wall Y %f", y_sens_dist);
 
-        map_vector[x_sens_cell*width_map + y_sens_cell]=100;
-        /*
-        for(int i = corner_x_cell ; i <= x_sens_cell; i++)
+        //map_vector[x_sens_cell+width_map*y_sens_cell]=100;
+        int x1, x2, y1, y2;
+        if (corner_x_cell > x_sens_cell) {
+            x1 = x_sens_cell;
+            x2 = corner_x_cell;
+        } else {
+            x1 = corner_x_cell;
+            x2 = x_sens_cell;
+        }
+        if (corner_y_cell > y_sens_cell) {
+            y1 = y_sens_cell;
+            y2 = corner_y_cell;
+        } else {
+            y1 = corner_y_cell;
+            y2 = y_sens_cell;
+        }
+
+        for(int i = x1 ; i <= x2; i++)
         {
-            for(int j = corner_y_cell ; j<= y_sens_cell; j++)
+            for(int j = y1 ; j <= y2; j++)
             {
-
-                if((i==x_sens_cell) && (j==y_sens_cell))
-                    map_vector[i*width_map+j] = 100;
+                if((i==x_sens_cell) && (j==y_sens_cell)) {
+                   // if (map_vector[i+width_map*j] != 0)
+                        map_vector[i+width_map*j] = 100;
+                }
                 else
                 {
-                    map_vector[i*width_map+j] = 0;
+                    map_vector[i+width_map*j] = 0;
 
                 }
-
-
             }
         }
-*/
+
 
 
         // Fill all cells between pose cell and sensed cell with 0 or +1;
