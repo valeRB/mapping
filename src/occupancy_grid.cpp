@@ -7,6 +7,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "transforms/IrTransformMsg.h"
 #include "tf/transform_listener.h"
+#include "std_msgs/Bool.h"
 
 class OccupancyGrid
 {
@@ -15,6 +16,7 @@ public:
     ros::Subscriber odometry_subscriber;
     ros::Subscriber sensor_subscriber;
     ros::Publisher occupancy_publisher;
+    ros::Subscriber turn_sub;
     //ros::Publisher pose_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
@@ -22,10 +24,11 @@ public:
     int width_robot, height_robot; //[cell], preferably even number
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
+    std_msgs::Bool turning;
     transforms::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
 
-    std::vector<signed char> map_vector;
+    std::vector<signed char> map_vector, final_map;
 
 
     OccupancyGrid()
@@ -48,6 +51,7 @@ public:
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
         //pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
+        turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
     }
 
 
@@ -58,27 +62,12 @@ public:
         theta_t = pose_msg->theta;
         // 1. Update map every time we move to another cell
         x_pose_cell_map = floor((center_x + x_t)/resolution);
-        y_pose_cell_map = floor((center_y - y_t)/resolution);
+        y_pose_cell_map = floor((center_y + y_t)/resolution);
         // Initial values of previous values != than zero
 
         width_robot=10; //[cell]
         height_robot=10; //[cell]
 
-        if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
-        {
-            for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
-            {
-                for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
-                {
-                    map_vector[i*width_map+j] = 0;
-
-                }
-            }
-            prev_x_pose_cell = x_pose_cell_map;
-            prev_y_pose_cell = y_pose_cell_map;
-        }
-
-        // 2. Check if sensors are giving measurements
         if(sensor_msg.s1 == true)
         {
             mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
@@ -91,13 +80,33 @@ public:
 
         if(sensor_msg.s3 == true)
         {
-            //mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
+            mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
         }
 
         if(sensor_msg.s4 == true)
         {
-            //mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
+            mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
         }
+
+        if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
+        {
+            for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
+            {
+                for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
+                {
+                    map_vector[i+width_map*j] = 0;
+
+                }
+            }
+            prev_x_pose_cell = x_pose_cell_map;
+            prev_y_pose_cell = y_pose_cell_map;
+        }
+
+
+
+        // 2. Check if sensors are giving measurements
+        //if (turning.data == false) {}
+
 
 
         // 3. Update cell that has been sensed and in between cells
@@ -122,6 +131,10 @@ public:
 
     }
 
+    void turnCallback(const std_msgs::Bool &msg) {
+        turning = msg;
+    }
+
     void mapInit()
     {
         // Map set to be 10mx10m
@@ -130,10 +143,12 @@ public:
         int cellNumber=width_map*height_map;
         resolution = 0.02; //[m/cell]
         map_vector = std::vector<signed char>(cellNumber,-1);
+        final_map = std::vector<signed char>(cellNumber,-1);
         center_x = width_map/2 * resolution; //[m]
         center_y = width_map/2 * resolution; //[m]
         prev_x_pose_cell=1000;
         prev_y_pose_cell=1000;
+        turning.data=false;
     }
 
     // Function needs working on
@@ -147,6 +162,7 @@ public:
 
         int x_sens_cell = floor(x_sens_dist/resolution);
         int y_sens_cell = floor(y_sens_dist/resolution);
+        int weight_cell = 5;
         double corner_x, corner_y;
         int corner_x_cell, corner_y_cell;
         tf::StampedTransform transform;
@@ -217,28 +233,80 @@ public:
             }
 
         }
-        //ROS_INFO("Corner X %d", corner_x);
-        //ROS_INFO("Corner Y %d", corner_y);
+        ROS_INFO("Corner X %f", corner_x);
+        ROS_INFO("Corner Y %f", corner_y);
+        ROS_INFO("Wall X %f", x_sens_dist);
+        ROS_INFO("Wall Y %f", y_sens_dist);
 
-        map_vector[x_sens_cell*width_map + y_sens_cell]=100;
-        /*
-        for(int i = corner_x_cell ; i <= x_sens_cell; i++)
+        //map_vector[x_sens_cell+width_map*y_sens_cell]=100;
+        int x1, x2, y1, y2;
+        if (corner_x_cell > x_sens_cell) {
+            x1 = x_sens_cell;
+            x2 = corner_x_cell;
+        } else {
+            x1 = corner_x_cell;
+            x2 = x_sens_cell;
+        }
+        if (corner_y_cell > y_sens_cell) {
+            y1 = y_sens_cell;
+            y2 = corner_y_cell;
+        } else {
+            y1 = corner_y_cell;
+            y2 = y_sens_cell;
+        }
+        for(int i = x2 ; i >= x1; i--)
         {
-            for(int j = corner_y_cell ; j<= y_sens_cell; j++)
+            for(int j = y2 ; j >= y1; j--)
             {
-
                 if((i==x_sens_cell) && (j==y_sens_cell))
-                    map_vector[i*width_map+j] = 100;
+                    //map_vector[i+width_map*j] = 100;
+                    map_vector[i+width_map*j] = map_vector[i+width_map*j] + weight_cell;
                 else
                 {
-                    map_vector[i*width_map+j] = 0;
-
+                    if(map_vector[i+width_map*j]==-1)
+                    {
+                        map_vector[i+width_map*j] = 0;
+                    }
                 }
-
-
             }
         }
-*/
+
+
+        /*
+        for(int i = x1 ; i <= x2; i++)
+        {
+            for(int j = y1 ; j <= y2; j++)
+            {
+                if((i==x_sens_cell) && (j==y_sens_cell)) {
+                   // if (map_vector[i+width_map*j] != 0)
+                    if(turning.data == true)
+                    {
+                        if(map_vector[i+width_map*j] == -1)
+                            map_vector[i+width_map*j] = 100;
+                    }
+                    else
+                    {
+                        map_vector[i+width_map*j] = 100;
+                    }
+
+                }
+                else
+                {
+                    if(turning.data == true)
+                    {
+                        if(map_vector[i+width_map*j] == -1)
+                            map_vector[i+width_map*j] = 0;
+                    }
+                    else
+                    {
+                        if(map_vector[i+width_map*j] == -1)
+                            map_vector[i+width_map*j] = 0;
+                    }
+
+                }
+            }
+        }*/
+
 
 
         // Fill all cells between pose cell and sensed cell with 0 or +1;
@@ -274,10 +342,20 @@ public:
         grid_msg.info.origin.position.x = 0;
         grid_msg.info.origin.position.y = 0;
         grid_msg.info.origin.position.z = 0;
+        int threshold = 10;
 
-        grid_msg.data = map_vector;
+        for(int k = 0; k < width_map; k++)
+        {
+            for(int l=0; l < width_map; l++)
+            {
+                if(map_vector[k+width_map*l] >threshold)
+                    final_map[k+width_map*l] = 150;
+                if((map_vector[k+width_map*l] <= threshold) && (map_vector[k+width_map*l]>=0))
+                    final_map[k+width_map*l] = 0;
+            }
+        }
 
-
+        grid_msg.data = final_map;
         occupancy_publisher.publish(grid_msg);
 
     }
