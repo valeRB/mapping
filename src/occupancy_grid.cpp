@@ -17,7 +17,7 @@ public:
     ros::Subscriber sensor_subscriber;
     ros::Publisher occupancy_publisher;
     ros::Subscriber turn_sub;
-    //ros::Publisher pose_publisher;
+    ros::Publisher pose_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
     double resolution, center_x, center_y;
@@ -50,7 +50,7 @@ public:
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
-        //pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
+        pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
     }
 
@@ -111,22 +111,26 @@ public:
 
         // 3. Update cell that has been sensed and in between cells
 
-        /*
-        In case we want to view our direction
+
+        //In case we want to view our direction
         //Publish pose for visualization
         geometry_msgs::PoseStamped poseStamp_msg;
-        poseStamp_msg.header.frame_id = "map";
-        poseStamp_msg.header.stamp = ros::Time();
+        poseStamp_msg.header.frame_id = "robot_center";
+        poseStamp_msg.header.stamp = ros::Time(0);
         poseStamp_msg.pose.position.x = 0;
         poseStamp_msg.pose.position.y = 0;
         poseStamp_msg.pose.position.z = 0;
-        poseStamp_msg.pose.orientation.x = 0;
+        tf::Quaternion q;
+        q.setEuler(0.0, 0.0, M_PI_2);
+        tf::quaternionTFToMsg(q, poseStamp_msg.pose.orientation);
+        //poseStamp_msg.pose.orientation = test;
+        /*poseStamp_msg.pose.orientation.x = 0;
         poseStamp_msg.pose.orientation.y = 0;
-        poseStamp_msg.pose.orientation.z = 0;
-        poseStamp_msg.pose.orientation.w = 1;
+        poseStamp_msg.pose.orientation.z = ;
+        poseStamp_msg.pose.orientation.w = 1;*/
 
         pose_publisher.publish(poseStamp_msg);
-        */
+
         // Estimate cells to update here
 
     }
