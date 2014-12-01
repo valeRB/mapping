@@ -5,9 +5,12 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "vector"
 #include "geometry_msgs/PoseStamped.h"
-#include "transforms/IrTransformMsg.h"
+#include "robot_msgs/IrTransformMsg.h"
 #include "tf/transform_listener.h"
 #include "std_msgs/Bool.h"
+#include <robot_msgs/detectedObject.h>
+#include <vector>
+#include <visualization_msgs/Marker.h>
 
 class OccupancyGrid
 {
@@ -18,6 +21,8 @@ public:
     ros::Publisher occupancy_publisher;
     ros::Subscriber turn_sub;
     ros::Publisher pose_publisher;
+    ros::Subscriber object_subscriber;
+    ros::Publisher object_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
     double resolution, center_x, center_y;
@@ -25,7 +30,7 @@ public:
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
     std_msgs::Bool turning;
-    transforms::IrTransformMsg sensor_msg;
+    robot_msgs::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
 
     std::vector<signed char> map_vector, final_map;
@@ -48,10 +53,12 @@ public:
         // Subscribers:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
+        turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
+        object_subscriber = n.subscribe("/object", 1, &OccupancyGrid::objectCallback, this);
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
-        turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
+        object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
     }
 
 
@@ -137,6 +144,10 @@ public:
 
     void turnCallback(const std_msgs::Bool &msg) {
         turning = msg;
+    }
+
+    void objectCallback(const robot_msgs::detectedObject &msg) {
+        detected_objects.push_back(msg);
     }
 
     void mapInit()
@@ -274,52 +285,9 @@ public:
                 }
             }
         }
-
-
-        /*
-        for(int i = x1 ; i <= x2; i++)
-        {
-            for(int j = y1 ; j <= y2; j++)
-            {
-                if((i==x_sens_cell) && (j==y_sens_cell)) {
-                   // if (map_vector[i+width_map*j] != 0)
-                    if(turning.data == true)
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 100;
-                    }
-                    else
-                    {
-                        map_vector[i+width_map*j] = 100;
-                    }
-
-                }
-                else
-                {
-                    if(turning.data == true)
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 0;
-                    }
-                    else
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 0;
-                    }
-
-                }
-            }
-        }*/
-
-
-
-        // Fill all cells between pose cell and sensed cell with 0 or +1;
-        // needs working on
-
-
     }
 
-    void sensorCallback(const transforms::IrTransformMsg &msg)
+    void sensorCallback(const robot_msgs::IrTransformMsg &msg)
     {
         //Only if the measurement is valid will we get the points
 
@@ -364,19 +332,43 @@ public:
 
     }
 
-    /*
-    void sensorCallback(const something::something::ConstPtr &sensor_msg)
-    {
+    void objectVisualize() {
 
+        visualization_msgs::Marker marker;
+
+        if (detected_objects.size() != 0) {
+            marker.header.frame_id = "map";
+            for (std::vector<robot_msgs::detectedObject>::iterator it = detected_objects.begin(); it != detected_objects.end(); ++it) {
+                marker.header.stamp = ros::Time();
+                marker.ns = "my_namespace";
+                marker.id = 0;
+                marker.type = visualization_msgs::Marker::SPHERE;
+                marker.action = visualization_msgs::Marker::ADD;
+                marker.pose.position.x = 1;
+                marker.pose.position.y = 1;
+                marker.pose.position.z = 1;
+                marker.pose.orientation.x = 0.0;
+                marker.pose.orientation.y = 0.0;
+                marker.pose.orientation.z = 0.0;
+                marker.pose.orientation.w = 1.0;
+                marker.scale.x = 1;
+                marker.scale.y = 0.1;
+                marker.scale.z = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+
+                object_publisher.publish(marker);
+            }
+        }
     }
-    */
 
 
 private:
 
     //OccupancyGrid *occupancy_grid_;
-
-
+    std::vector<robot_msgs::detectedObject> detected_objects;
 };
 
 int main(int argc, char **argv)
