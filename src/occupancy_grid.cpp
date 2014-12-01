@@ -5,9 +5,12 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "vector"
 #include "geometry_msgs/PoseStamped.h"
+#include "geometry_msgs/Pose.h"
 #include "transforms/IrTransformMsg.h"
 #include "tf/transform_listener.h"
 #include "std_msgs/Bool.h"
+#include "visualization_msgs/Marker.h"
+
 
 class OccupancyGrid
 {
@@ -16,8 +19,10 @@ public:
     ros::Subscriber odometry_subscriber;
     ros::Subscriber sensor_subscriber;
     ros::Publisher occupancy_publisher;
+    ros::Subscriber object_subscriber;
     ros::Subscriber turn_sub;
     ros::Publisher pose_publisher;
+    ros::Publisher object_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
     double resolution, center_x, center_y;
@@ -25,10 +30,13 @@ public:
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
     std_msgs::Bool turning;
+    //geometry_msgs::PointStamped object_pose;
     transforms::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
+    nav_msgs::OccupancyGrid grid_msg;
 
     std::vector<signed char> map_vector, final_map;
+    nav_msgs::OccupancyGrid grid_msg;
 
 
     OccupancyGrid()
@@ -48,10 +56,12 @@ public:
         // Subscribers:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
-        // Publishers:
-        occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/nav/grid", 1);
-        pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
+        object_subscriber = n.subscribe("/object_pose",1, &OccupancyGrid::objectCallback, this);
         turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
+        // Publishers:
+        occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/gridmap", 1);
+        pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
+        object_publisher = n.advertise<visualization_msgs::Marker>("/object_marker",1);        
     }
 
 
@@ -65,8 +75,19 @@ public:
         y_pose_cell_map = floor((center_y + y_t)/resolution);
         // Initial values of previous values != than zero
 
-        width_robot=10; //[cell]
-        height_robot=10; //[cell]
+        if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
+        {
+            for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
+            {
+                for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
+                {
+                    map_vector[i+width_map*j] = 1;
+
+                }
+            }
+            prev_x_pose_cell = x_pose_cell_map;
+            prev_y_pose_cell = y_pose_cell_map;
+        }
 
         if(sensor_msg.s1 == true)
         {
@@ -88,28 +109,6 @@ public:
             mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
         }
 
-        if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
-        {
-            for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
-            {
-                for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
-                {
-                    map_vector[i+width_map*j] = 0;
-
-                }
-            }
-            prev_x_pose_cell = x_pose_cell_map;
-            prev_y_pose_cell = y_pose_cell_map;
-        }
-
-
-
-        // 2. Check if sensors are giving measurements
-        //if (turning.data == false) {}
-
-
-
-        // 3. Update cell that has been sensed and in between cells
 
 
         //In case we want to view our direction
@@ -123,12 +122,6 @@ public:
         tf::Quaternion q;
         q.setEuler(0.0, 0.0, M_PI_2);
         tf::quaternionTFToMsg(q, poseStamp_msg.pose.orientation);
-        //poseStamp_msg.pose.orientation = test;
-        /*poseStamp_msg.pose.orientation.x = 0;
-        poseStamp_msg.pose.orientation.y = 0;
-        poseStamp_msg.pose.orientation.z = ;
-        poseStamp_msg.pose.orientation.w = 1;*/
-
         pose_publisher.publish(poseStamp_msg);
 
         // Estimate cells to update here
@@ -137,6 +130,38 @@ public:
 
     void turnCallback(const std_msgs::Bool &msg) {
         turning = msg;
+    }
+
+    void objectCallback(const geometry_msgs::Pose &obj_msg)
+    {
+        //object_pose = obj_msg;
+
+        visualization_msgs::Marker object;
+        object.header.frame_id = "map";
+        object.header.stamp = ros::Time(0);
+        object.ns = "object0";
+        object.id = 0;
+        object.type = visualization_msgs::Marker::CUBE;
+        object.action = visualization_msgs::Marker::ADD;
+        object.pose.position.x = obj_msg.position.x;
+        object.pose.position.y = obj_msg.position.y;
+        object.pose.position.z = obj_msg.position.z;
+        object.pose.orientation.w = obj_msg.orientation.w;
+        object.pose.orientation.x = obj_msg.orientation.x;
+        object.pose.orientation.y = obj_msg.orientation.y;
+        object.pose.orientation.z = obj_msg.orientation.z;
+        object.scale.x = 0.1;
+        object.scale.y = 0.1;
+        object.scale.z = 0.1;
+        object.color.a = 1.0;
+        object.color.r = 1.0;
+        object.color.g = 1.0;
+        object.color.b = 0;
+
+        object_publisher.publish( object );
+
+
+
     }
 
     void mapInit()
@@ -148,11 +173,30 @@ public:
         resolution = 0.02; //[m/cell]
         map_vector = std::vector<signed char>(cellNumber,-1);
         final_map = std::vector<signed char>(cellNumber,-1);
+
         center_x = width_map/2 * resolution; //[m]
         center_y = width_map/2 * resolution; //[m]
         prev_x_pose_cell=1000;
         prev_y_pose_cell=1000;
+        width_robot=10; //[cell]
+        height_robot=10; //[cell]
         turning.data=false;
+
+        // The time at which the map was loaded
+        grid_msg.header.stamp=ros::Time(0);
+        grid_msg.header.frame_id = "map";
+        //init_grid_msg.info.map_load_time = ros::Time();
+
+        grid_msg.info.resolution = resolution;
+        // Set width [cell] and height [cell] of grid
+        grid_msg.info.height = height_map;
+        grid_msg.info.width = width_map;
+        // The time at which the map was loaded
+        //grid_msg.info.map_load_time = ros::Time();
+        // Set origin of map in [m,m,rad]
+        grid_msg.info.origin.position.x = 0;
+        grid_msg.info.origin.position.y = 0;
+        grid_msg.info.origin.position.z = 0;
     }
 
     // Function needs working on
@@ -237,10 +281,7 @@ public:
             }
 
         }
-        ROS_INFO("Corner X %f", corner_x);
-        ROS_INFO("Corner Y %f", corner_y);
-        ROS_INFO("Wall X %f", x_sens_dist);
-        ROS_INFO("Wall Y %f", y_sens_dist);
+
 
         //map_vector[x_sens_cell+width_map*y_sens_cell]=100;
         int x1, x2, y1, y2;
@@ -263,8 +304,12 @@ public:
             for(int j = y2 ; j >= y1; j--)
             {
                 if((i==x_sens_cell) && (j==y_sens_cell))
-                    //map_vector[i+width_map*j] = 100;
-                    map_vector[i+width_map*j] = map_vector[i+width_map*j] + weight_cell;
+                {
+                    if(map_vector[i+width_map*j] == -1)
+                        map_vector[i+width_map*j] = 5;
+                    else
+                        map_vector[i+width_map*j] = map_vector[i+width_map*j] + weight_cell;
+                }
                 else
                 {
                     if(map_vector[i+width_map*j]==-1)
@@ -329,33 +374,22 @@ public:
 
     void gridVisualize()
     {
-        nav_msgs::OccupancyGrid grid_msg;
 
-        // The time at which the map was loaded
-        grid_msg.header.stamp=ros::Time();
-        grid_msg.header.frame_id = "map";
-        //init_grid_msg.info.map_load_time = ros::Time();
-
-        grid_msg.info.resolution = resolution;
-        // Set width [cell] and height [cell] of grid
-        grid_msg.info.height = height_map;
-        grid_msg.info.width = width_map;
-        // The time at which the map was loaded
-        //grid_msg.info.map_load_time = ros::Time();
-        // Set origin of map in [m,m,rad]
-        grid_msg.info.origin.position.x = 0;
-        grid_msg.info.origin.position.y = 0;
-        grid_msg.info.origin.position.z = 0;
         int threshold = 10;
-
+        // Create map
         for(int k = 0; k < width_map; k++)
         {
             for(int l=0; l < width_map; l++)
             {
-                if(map_vector[k+width_map*l] >threshold)
+                if((map_vector[k+width_map*l] >threshold) && ((map_vector[k+width_map*l] % 5) == 0))
+                {
                     final_map[k+width_map*l] = 150;
+                }
+
                 if((map_vector[k+width_map*l] <= threshold) && (map_vector[k+width_map*l]>=0))
+                {
                     final_map[k+width_map*l] = 0;
+                }
             }
         }
 
@@ -363,13 +397,6 @@ public:
         occupancy_publisher.publish(grid_msg);
 
     }
-
-    /*
-    void sensorCallback(const something::something::ConstPtr &sensor_msg)
-    {
-
-    }
-    */
 
 
 private:
