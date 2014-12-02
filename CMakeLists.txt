@@ -22,3 +22,5 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(occupancy_grid src/occupancy_grid.cpp)
 target_link_libraries(occupancy_grid ${catkin_LIBRARIES})
+add_executable(obtain_map src/obtain_map.cpp)
+target_link_libraries(obtain_map ${catkin_LIBRARIES})
