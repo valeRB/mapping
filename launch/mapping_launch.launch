@@ -1,7 +1,7 @@
 <launch>
     <!-- Transform nodes -->
     <node pkg="odometry_estimate" type="pose_estimation" name="pose_estimation" />
-    <node pkg="mapping" type="occupancy_grid" name="occupancy_grid" />
+    <node pkg="mapping" type="occupancy_grid" name="occupancy_grid" output="screen" />
    
     <node pkg="transforms" type="ir_transform_node" name="ir_transform" output="screen" /> 
 

@@ -6,7 +6,7 @@
 #include "vector"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Pose.h"
-#include "transforms/IrTransformMsg.h"
+#include "robot_msgs/IrTransformMsg.h"
 #include "tf/transform_listener.h"
 #include "std_msgs/Bool.h"
 #include "visualization_msgs/Marker.h"
@@ -21,23 +21,23 @@ public:
     ros::Publisher occupancy_publisher;
     ros::Subscriber object_subscriber;
     ros::Subscriber turn_sub;
+    ros::Subscriber mappingDone_sub;
     ros::Publisher pose_publisher;
     ros::Publisher object_publisher;
+    ros::Publisher costMap_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
     double resolution, center_x, center_y;
     int width_robot, height_robot; //[cell], preferably even number
     int x_pose_cell_map, y_pose_cell_map;
     int prev_x_pose_cell, prev_y_pose_cell;
-    std_msgs::Bool turning;
+    std_msgs::Bool turning, mapping_done;
     //geometry_msgs::PointStamped object_pose;
-    transforms::IrTransformMsg sensor_msg;
+    robot_msgs::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
     nav_msgs::OccupancyGrid grid_msg;
 
-    std::vector<signed char> map_vector, final_map;
-    nav_msgs::OccupancyGrid grid_msg;
-
+    std::vector<signed char> map_vector, final_map, cost_map;
 
     OccupancyGrid()
     {
@@ -57,9 +57,11 @@ public:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
         object_subscriber = n.subscribe("/object_pose",1, &OccupancyGrid::objectCallback, this);
-        turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
+        //turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
+        mappingDone_sub = n.subscribe("/map_done", 1, &OccupancyGrid::mapDoneCallback, this);
         // Publishers:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/gridmap", 1);
+        costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         object_publisher = n.advertise<visualization_msgs::Marker>("/object_marker",1);        
     }
@@ -81,6 +83,11 @@ public:
             {
                 for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
                 {
+
+                    if(cost_map[i + width_map*j] == 100)
+                    {
+                        costMapUpdate(i, j, 0);
+                    }
                     map_vector[i+width_map*j] = 1;
 
                 }
@@ -128,8 +135,8 @@ public:
 
     }
 
-    void turnCallback(const std_msgs::Bool &msg) {
-        turning = msg;
+    void mapDoneCallback(const std_msgs::Bool &msg) {
+        mapping_done = msg;
     }
 
     void objectCallback(const geometry_msgs::Pose &obj_msg)
@@ -173,7 +180,7 @@ public:
         resolution = 0.02; //[m/cell]
         map_vector = std::vector<signed char>(cellNumber,-1);
         final_map = std::vector<signed char>(cellNumber,-1);
-
+        cost_map = std::vector<signed char>(cellNumber,-1);
         center_x = width_map/2 * resolution; //[m]
         center_y = width_map/2 * resolution; //[m]
         prev_x_pose_cell=1000;
@@ -197,6 +204,8 @@ public:
         grid_msg.info.origin.position.x = 0;
         grid_msg.info.origin.position.y = 0;
         grid_msg.info.origin.position.z = 0;
+        mapping_done.data = false;
+
     }
 
     // Function needs working on
@@ -364,7 +373,7 @@ public:
 
     }
 
-    void sensorCallback(const transforms::IrTransformMsg &msg)
+    void sensorCallback(const robot_msgs::IrTransformMsg &msg)
     {
         //Only if the measurement is valid will we get the points
 
@@ -384,19 +393,46 @@ public:
                 if((map_vector[k+width_map*l] >threshold) && ((map_vector[k+width_map*l] % 5) == 0))
                 {
                     final_map[k+width_map*l] = 150;
+                    costMapUpdate(k,l, 100);
                 }
 
                 if((map_vector[k+width_map*l] <= threshold) && (map_vector[k+width_map*l]>=0))
                 {
                     final_map[k+width_map*l] = 0;
+                    if(cost_map[k+width_map*l] != 100)
+                        cost_map[k+width_map*l] = 0;
                 }
+
             }
         }
 
         grid_msg.data = final_map;
         occupancy_publisher.publish(grid_msg);
 
+
+        //costMapCreate();
+        grid_msg.data = cost_map;
+        costMap_publisher.publish(grid_msg);
+
+
     }
+
+    void costMapUpdate(int x_1, int y_1, int value)
+    {
+
+        for(int i = x_1-(width_robot/2); i <= (x_1+(width_robot/2)); i++)
+        {
+            for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
+            {
+                if(cost_map[i + width_map*j] != value){
+                    cost_map[i + width_map*j] = value;
+
+                }
+            }
+        }
+    }
+
+
 
 
 private:
