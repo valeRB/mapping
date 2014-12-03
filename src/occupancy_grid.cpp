@@ -10,6 +10,8 @@
 #include "tf/transform_listener.h"
 #include "std_msgs/Bool.h"
 #include "visualization_msgs/Marker.h"
+#include "signal.h"
+#include "rosbag/bag.h"
 
 
 class OccupancyGrid
@@ -432,7 +434,10 @@ public:
         }
     }
 
-
+    nav_msgs::OccupancyGrid get_map()
+    {
+        return grid_msg;
+    }
 
 
 private:
@@ -442,13 +447,31 @@ private:
 
 };
 
+OccupancyGrid* _map;
+
+void save_maps(int sig)
+{
+    ROS_INFO("Record Bag");
+    rosbag::Bag bag;
+    bag.open("map_test.bag", rosbag::bagmode::Write);
+    nav_msgs::OccupancyGrid msg = _map->get_map();
+    bag.write("/gridmap", ros::Time::now(), msg);
+    bag.close();
+    ros::shutdown();
+}
+
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "occupancy_grid");
-
+    signal(SIGINT,save_maps);
     OccupancyGrid map;
+
+
     map.init();
     map.mapInit();
+
     ros::Rate loop_rate(20.0);
 
     while(map.n.ok())

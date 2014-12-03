@@ -5,6 +5,7 @@ project(mapping)
 find_package(catkin REQUIRED COMPONENTS 
   roscpp 
   tf
+  rosbag
 #  genmsg
 )
 
@@ -13,7 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## Declare a catkin package
 catkin_package(
-# CATKIN_DEPENDS message_runtime
+ CATKIN_DEPENDS
+  rosbag
 )
 
 ## Build talker and listener
