@@ -3,13 +3,14 @@
 #include "geometry_msgs/Twist.h"
 #include "ras_arduino_msgs/Odometry.h"
 #include "nav_msgs/OccupancyGrid.h"
-#include "vector"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Pose.h"
 #include "robot_msgs/IrTransformMsg.h"
 #include "tf/transform_listener.h"
 #include "std_msgs/Bool.h"
-#include "visualization_msgs/Marker.h"
+#include <robot_msgs/detectedObject.h>
+#include <vector>
+#include <visualization_msgs/Marker.h>
 #include "signal.h"
 #include "rosbag/bag.h"
 #include "robot_msgs/detectedObject.h"
@@ -40,7 +41,6 @@ public:
     robot_msgs::IrTransformMsg sensor_msg;
     tf::TransformListener listener;
     nav_msgs::OccupancyGrid grid_msg;
-
     std::vector<signed char> map_vector, final_map, cost_map;
 
     OccupancyGrid()
@@ -67,7 +67,7 @@ public:
         occupancy_publisher = n.advertise<nav_msgs::OccupancyGrid>("/gridmap", 1);
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
-        object_publisher = n.advertise<visualization_msgs::Marker>("/object_marker",1);        
+        object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
     }
 
 
@@ -245,7 +245,6 @@ public:
 
         //robot_msgs::detectedObject object;
 
-
     }
 
     void mapInit()
@@ -311,6 +310,7 @@ public:
                 corner_y = transform.getOrigin().getY();
                 corner_x_cell = floor(corner_x/resolution);
                 corner_y_cell = floor(corner_y/resolution);
+                ros::Time::init();
             }
                 catch(tf::TransformException ex)
                 {
@@ -405,49 +405,6 @@ public:
                 }
             }
         }
-
-
-        /*
-        for(int i = x1 ; i <= x2; i++)
-        {
-            for(int j = y1 ; j <= y2; j++)
-            {
-                if((i==x_sens_cell) && (j==y_sens_cell)) {
-                   // if (map_vector[i+width_map*j] != 0)
-                    if(turning.data == true)
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 100;
-                    }
-                    else
-                    {
-                        map_vector[i+width_map*j] = 100;
-                    }
-
-                }
-                else
-                {
-                    if(turning.data == true)
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 0;
-                    }
-                    else
-                    {
-                        if(map_vector[i+width_map*j] == -1)
-                            map_vector[i+width_map*j] = 0;
-                    }
-
-                }
-            }
-        }*/
-
-
-
-        // Fill all cells between pose cell and sensed cell with 0 or +1;
-        // needs working on
-
-
     }
 
     void sensorCallback(const robot_msgs::IrTransformMsg &msg)
@@ -498,6 +455,38 @@ public:
 
     }
 
+    void objectVisualize() {
+
+        visualization_msgs::Marker marker;
+
+        if (detected_objects.size() != 0) {
+            marker.header.frame_id = "map";
+            for (std::vector<robot_msgs::detectedObject>::iterator it = detected_objects.begin(); it != detected_objects.end(); ++it) {
+                marker.header.stamp = ros::Time();
+                marker.ns = "my_namespace";
+                marker.id = 0;
+                marker.type = visualization_msgs::Marker::SPHERE;
+                marker.action = visualization_msgs::Marker::ADD;
+                marker.pose.position.x = 1;
+                marker.pose.position.y = 1;
+                marker.pose.position.z = 1;
+                marker.pose.orientation.x = 0.0;
+                marker.pose.orientation.y = 0.0;
+                marker.pose.orientation.z = 0.0;
+                marker.pose.orientation.w = 1.0;
+                marker.scale.x = 1;
+                marker.scale.y = 0.1;
+                marker.scale.z = 0.1;
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+
+                object_publisher.publish(marker);
+            }
+        }
+    }
+
     void costMapUpdate(int x_1, int y_1, int value)
     {
 
@@ -515,24 +504,29 @@ public:
 
     nav_msgs::OccupancyGrid get_map()
     {
+        grid_msg.data = final_map;
         return grid_msg;
     }
 
+    nav_msgs::OccupancyGrid get_costMap()
+    {
+        grid_msg.data = cost_map;
+        return grid_msg;
+    }
 
 private:
 
     //OccupancyGrid *occupancy_grid_;
-
-
+    std::vector<robot_msgs::detectedObject> detected_objects;
 };
 
 OccupancyGrid* _map;
 
 void save_maps(int sig)
 {
-    ROS_INFO("Record Bag");
+    std::cout<<"Record Bag \n";
     rosbag::Bag bag;
-    bag.open("map_test.bag", rosbag::bagmode::Write);
+    bag.open("map_test_2.bag", rosbag::bagmode::Write);
     nav_msgs::OccupancyGrid msg = _map->get_map();
     bag.write("/gridmap", ros::Time::now(), msg);
     bag.close();
@@ -544,9 +538,9 @@ void save_maps(int sig)
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "occupancy_grid");
-    signal(SIGINT,save_maps);
-    OccupancyGrid map;
 
+    OccupancyGrid map;
+    _map = &map;
 
     map.init();
     map.mapInit();
@@ -559,6 +553,8 @@ int main(int argc, char **argv)
         map.gridVisualize();
         loop_rate.sleep();
     }
+
+    save_maps(1);
 
     return 0;
 }
