@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp 
   tf
   robot_msgs
+  rosbag
 #  genmsg
 )
 
@@ -14,13 +15,14 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## Declare a catkin package
 catkin_package(
-  CATKIN_DEPENDS roscpp tf robot_msgs
+  CATKIN_DEPENDS roscpp tf robot_msgs rosbag
 )
 
 ## Build talker and listener
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(occupancy_grid src/occupancy_grid.cpp)
+add_dependencies(occupancy_grid ${catkin_EXPORTED_TARGETS})
 target_link_libraries(occupancy_grid ${catkin_LIBRARIES})
 #add_executable(obtain_map src/obtain_map.cpp)
 #target_link_libraries(obtain_map ${catkin_LIBRARIES})
