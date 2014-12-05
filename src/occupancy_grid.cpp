@@ -3,7 +3,6 @@
 #include "geometry_msgs/Twist.h"
 #include "ras_arduino_msgs/Odometry.h"
 #include "nav_msgs/OccupancyGrid.h"
-#include "vector"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Pose.h"
 #include "robot_msgs/IrTransformMsg.h"
@@ -12,6 +11,9 @@
 #include <robot_msgs/detectedObject.h>
 #include <vector>
 #include <visualization_msgs/Marker.h>
+#include "signal.h"
+#include "rosbag/bag.h"
+
 
 class OccupancyGrid
 {
@@ -206,6 +208,7 @@ public:
                 corner_y = transform.getOrigin().getY();
                 corner_x_cell = floor(corner_x/resolution);
                 corner_y_cell = floor(corner_y/resolution);
+                ros::Time::init();
             }
                 catch(tf::TransformException ex)
                 {
@@ -393,19 +396,49 @@ public:
         }
     }
 
+    nav_msgs::OccupancyGrid get_map()
+    {
+        grid_msg.data = final_map;
+        return grid_msg;
+    }
+
+    nav_msgs::OccupancyGrid get_costMap()
+    {
+        grid_msg.data = cost_map;
+        return grid_msg;
+    }
+
 private:
 
     //OccupancyGrid *occupancy_grid_;
     std::vector<robot_msgs::detectedObject> detected_objects;
 };
 
+OccupancyGrid* _map;
+
+void save_maps(int sig)
+{
+    std::cout<<"Record Bag \n";
+    rosbag::Bag bag;
+    bag.open("map_test_2.bag", rosbag::bagmode::Write);
+    nav_msgs::OccupancyGrid msg = _map->get_map();
+    bag.write("/gridmap", ros::Time::now(), msg);
+    bag.close();
+    ros::shutdown();
+}
+
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "occupancy_grid");
 
     OccupancyGrid map;
+    _map = &map;
+
     map.init();
     map.mapInit();
+
     ros::Rate loop_rate(20.0);
 
     while(map.n.ok())
@@ -414,6 +447,8 @@ int main(int argc, char **argv)
         map.gridVisualize();
         loop_rate.sleep();
     }
+
+    save_maps(1);
 
     return 0;
 }
