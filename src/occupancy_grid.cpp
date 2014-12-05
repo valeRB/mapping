@@ -236,6 +236,7 @@ public:
                 corner_y = transform.getOrigin().getY();
                 corner_x_cell = floor(corner_x/resolution);
                 corner_y_cell = floor(corner_y/resolution);
+                ros::Time::init();
             }
                 catch(tf::TransformException ex)
                 {
@@ -436,6 +437,13 @@ public:
 
     nav_msgs::OccupancyGrid get_map()
     {
+        grid_msg.data = final_map;
+        return grid_msg;
+    }
+
+    nav_msgs::OccupancyGrid get_costMap()
+    {
+        grid_msg.data = cost_map;
         return grid_msg;
     }
 
@@ -451,9 +459,9 @@ OccupancyGrid* _map;
 
 void save_maps(int sig)
 {
-    ROS_INFO("Record Bag");
+    std::cout<<"Record Bag \n";
     rosbag::Bag bag;
-    bag.open("map_test.bag", rosbag::bagmode::Write);
+    bag.open("map_test_2.bag", rosbag::bagmode::Write);
     nav_msgs::OccupancyGrid msg = _map->get_map();
     bag.write("/gridmap", ros::Time::now(), msg);
     bag.close();
@@ -465,9 +473,9 @@ void save_maps(int sig)
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "occupancy_grid");
-    signal(SIGINT,save_maps);
-    OccupancyGrid map;
 
+    OccupancyGrid map;
+    _map = &map;
 
     map.init();
     map.mapInit();
@@ -480,6 +488,8 @@ int main(int argc, char **argv)
         map.gridVisualize();
         loop_rate.sleep();
     }
+
+    save_maps(1);
 
     return 0;
 }
