@@ -67,7 +67,7 @@ public:
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
-        service = n.advertiseService("object_in_map", &OccupancyGrid::checkObjectInMap, this);
+        service = n.advertiseService("/object_in_map", &OccupancyGrid::checkObjectInMap, this);
     }
 
 
