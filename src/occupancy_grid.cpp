@@ -153,9 +153,9 @@ public:
         obj.header.frame_id = "camera";
 
         listener.waitForTransform("/camera", "/map", ros::Time(0), ros::Duration(1));
-        //listener.transformPoint("map", obj, tf_object);
+        listener.transformPoint("map", obj, tf_object);
         ROS_INFO("ros time %d", ros::Time::now().sec);
-        tf::StampedTransform transform;
+        /*tf::StampedTransform transform;
         double x,y;
         try {
             listener.lookupTransform("/camera", "/map", obj_msg.header.stamp, transform);
@@ -164,7 +164,7 @@ public:
         } catch(tf::TransformException& ex){
             ROS_ERROR("Received an exception trying to transform a point from \"base_laser\" to \"base_link\": %s", ex.what());
             return;
-        }
+        }*/
 
         ROS_INFO("Detected %s", obj_msg.object_id.c_str());
         ROS_INFO("Coordinates x: %f y: %f", obj_msg.position.x, obj_msg.position.y);
