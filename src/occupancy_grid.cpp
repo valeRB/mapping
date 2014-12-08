@@ -13,6 +13,8 @@
 #include <visualization_msgs/Marker.h>
 #include "signal.h"
 #include "rosbag/bag.h"
+#include "robot_msgs/detectedObject.h"
+#include <string>
 #include <robot_msgs/checkObjectInMap.h>
 
 
@@ -59,7 +61,7 @@ public:
         // Subscribers:
         odometry_subscriber = n.subscribe("/arduino/odometry", 1, &OccupancyGrid::odometryCallback,this);
         sensor_subscriber = n.subscribe("/transformed_ir_points",1, &OccupancyGrid::sensorCallback,this);
-        object_subscriber = n.subscribe("/object_pose",1, &OccupancyGrid::objectCallback, this);
+        object_subscriber = n.subscribe("/object_recognition/detected_object",1, &OccupancyGrid::objectCallback, this);
         //turn_sub = n.subscribe("/robot_turn", 1, &OccupancyGrid::turnCallback, this);
         mappingDone_sub = n.subscribe("/map_done", 1, &OccupancyGrid::mapDoneCallback, this);
         // Publishers:
@@ -143,8 +145,108 @@ public:
         mapping_done = msg;
     }
 
-    void objectCallback(const robot_msgs::detectedObject &msg) {
-        detected_objects.push_back(msg);
+    void objectCallback(const robot_msgs::detectedObject &obj_msg)
+    {
+        //object_pose = obj_msg;
+        geometry_msgs::PointStamped tf_object;
+        geometry_msgs::PointStamped obj;
+        obj.point.x = obj_msg.position.x;
+        obj.point.y = obj_msg.position.y;
+        obj.header.frame_id = "camera";
+
+        listener.waitForTransform("/camera", "/map", ros::Time(0), ros::Duration(1));
+        listener.transformPoint("map", obj, tf_object);
+        ROS_INFO("ros time %d", ros::Time::now().sec);
+        /*tf::StampedTransform transform;
+        double x,y;
+        try {
+            listener.lookupTransform("/camera", "/map", obj_msg.header.stamp, transform);
+            x = transform.getOrigin().getX() + obj_msg.position.x;
+            y = transform.getOrigin().getY() + obj_msg.position.y;
+        } catch(tf::TransformException& ex){
+            ROS_ERROR("Received an exception trying to transform a point from \"base_laser\" to \"base_link\": %s", ex.what());
+            return;
+        }*/
+
+        ROS_INFO("Detected %s", obj_msg.object_id.c_str());
+        ROS_INFO("Coordinates x: %f y: %f", obj_msg.position.x, obj_msg.position.y);
+        ROS_INFO("Transformed coordinates x: %f y: %f", tf_object.point.x, tf_object.point.y);
+
+        visualization_msgs::Marker object;
+        object.header.frame_id = "map";
+        object.header.stamp = ros::Time(0);
+        object.ns = obj_msg.object_id;
+        object.id = 0;
+        //object.type = visualization_msgs::Marker::CUBE;
+        object.action = visualization_msgs::Marker::ADD;
+        object.pose.position.x = tf_object.point.x;
+        object.pose.position.y = tf_object.point.y;
+        object.pose.position.z = 0;
+        object.pose.orientation.w = 0;
+        object.pose.orientation.x = 0;
+        object.pose.orientation.y = 0;
+        object.pose.orientation.z = 0;
+        object.scale.x = 0.1;
+        object.scale.y = 0.1;
+        object.scale.z = 0.1;
+        /*object.color.a = 1.0;
+        object.color.r = 1.0;
+        object.color.g = 1.0;
+        object.color.b = 0;*/
+
+        if (obj_msg.object_id == "greencube") {
+            object.type = visualization_msgs::Marker::CUBE;
+            object.color.a = 1.0;
+            object.color.r = 0;
+            object.color.g = 1.0;
+            object.color.b = 0;
+        } else if (obj_msg.object_id == "greencylinder") {
+            object.type = visualization_msgs::Marker::CYLINDER;
+            object.color.a = 1.0;
+            object.color.r = 0;
+            object.color.g = 1.0;
+            object.color.b = 0;
+        } else if (obj_msg.object_id == "redball") {
+            object.type = visualization_msgs::Marker::SPHERE;
+            object.color.a = 1.0;
+            object.color.r = 1.0;
+            object.color.g = 0;
+            object.color.b = 0;
+        } else if (obj_msg.object_id == "redcube") {
+            object.type = visualization_msgs::Marker::CUBE;
+            object.color.a = 1.0;
+            object.color.r = 1.0;
+            object.color.g = 0;
+            object.color.b = 0;
+        } else if (obj_msg.object_id == "bluecube") {
+            object.type = visualization_msgs::Marker::CUBE;
+            object.color.a = 1.0;
+            object.color.r = 0;
+            object.color.g = 0;
+            object.color.b = 1.0;
+        } else if (obj_msg.object_id == "yellowcube") {
+            object.type = visualization_msgs::Marker::CUBE;
+            object.color.a = 1.0;
+            object.color.r = 1.0;
+            object.color.g = 1.0;
+            object.color.b = 0;
+        } else if (obj_msg.object_id == "yellowball") {
+            object.type = visualization_msgs::Marker::SPHERE;
+            object.color.a = 1.0;
+            object.color.r = 1.0;
+            object.color.g = 1.0;
+            object.color.b = 0;
+        }
+
+        int x_object_cell = floor(tf_object.point.x/resolution);
+        int y_object_cell = floor(tf_object.point.y/resolution);
+
+        final_map[x_object_cell+width_map*y_object_cell] = 110;
+
+        object_publisher.publish( object );
+
+        //robot_msgs::detectedObject object;
+
     }
 
     void mapInit()
@@ -326,13 +428,17 @@ public:
             {
                 if((map_vector[k+width_map*l] >threshold) && ((map_vector[k+width_map*l] % 5) == 0))
                 {
-                    final_map[k+width_map*l] = 150;
+                    if(final_map[k+width_map*l] != 110) {
+                        final_map[k+width_map*l] = 150;
+                    }
                     costMapUpdate(k,l, 100);
                 }
 
                 if((map_vector[k+width_map*l] <= threshold) && (map_vector[k+width_map*l]>=0))
                 {
-                    final_map[k+width_map*l] = 0;
+                    if(final_map[k+width_map*l] != 110) {
+                       final_map[k+width_map*l] = 0;
+                    }
                     if(cost_map[k+width_map*l] != 100)
                         cost_map[k+width_map*l] = 0;
                 }
