@@ -517,10 +517,13 @@ public:
     }
 
     bool checkObjectInMap(robot_msgs::checkObjectInMap::Request &req, robot_msgs::checkObjectInMap::Response &res) {
-        int width = 10;
-        for(int i = req.point.x-width/2; i <= req.point.x+width/2; i++)
+        int width = 16;
+	int x = floor((center_x + req.point.x)/resolution);
+	int y = floor((center_y + req.point.y)/resolution);
+
+        for(int i = x-width/2; i <= x+width/2; i++)
         {
-            for(int j = req.point.y-width/2; j <= req.point.y+width/2; j++)
+            for(int j = y-width/2; j <= y+width/2; j++)
             {
 
                 if(final_map[i + width_map*j] == 110)
