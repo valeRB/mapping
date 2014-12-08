@@ -15,6 +15,7 @@
 #include "rosbag/bag.h"
 #include "robot_msgs/detectedObject.h"
 #include <string>
+#include <robot_msgs/checkObjectInMap.h>
 
 
 class OccupancyGrid
@@ -68,6 +69,7 @@ public:
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
+        service = n.advertiseService("/object_in_map", &OccupancyGrid::checkObjectInMap, this);
     }
 
 
@@ -514,10 +516,30 @@ public:
         return grid_msg;
     }
 
+    bool checkObjectInMap(robot_msgs::checkObjectInMap::Request &req, robot_msgs::checkObjectInMap::Response &res) {
+        int width = 10;
+        for(int i = req.point.x-width/2; i <= req.point.x+width/2; i++)
+        {
+            for(int j = req.point.y-width/2; j <= req.point.y+width/2; j++)
+            {
+
+                if(final_map[i + width_map*j] == 110)
+                {
+                    res.inMap = true;
+                    return true;
+                }
+            }
+        }
+
+        res.inMap = false;
+        return true;
+    }
+
 private:
 
     //OccupancyGrid *occupancy_grid_;
     std::vector<robot_msgs::detectedObject> detected_objects;
+    ros::ServiceServer service;
 };
 
 OccupancyGrid* _map;
