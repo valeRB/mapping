@@ -156,21 +156,18 @@ public:
 
         listener.waitForTransform("/camera", "/map", ros::Time(0), ros::Duration(1));
         listener.transformPoint("map", obj, tf_object);
-        ROS_INFO("ros time %d", ros::Time::now().sec);
-        /*tf::StampedTransform transform;
-        double x,y;
-        try {
-            listener.lookupTransform("/camera", "/map", obj_msg.header.stamp, transform);
-            x = transform.getOrigin().getX() + obj_msg.position.x;
-            y = transform.getOrigin().getY() + obj_msg.position.y;
-        } catch(tf::TransformException& ex){
-            ROS_ERROR("Received an exception trying to transform a point from \"base_laser\" to \"base_link\": %s", ex.what());
-            return;
-        }*/
 
         ROS_INFO("Detected %s", obj_msg.object_id.c_str());
         ROS_INFO("Coordinates x: %f y: %f", obj_msg.position.x, obj_msg.position.y);
         ROS_INFO("Transformed coordinates x: %f y: %f", tf_object.point.x, tf_object.point.y);
+        int x = floor((tf_object.point.x)/resolution);
+        int y = floor((tf_object.point.y)/resolution);
+        ROS_INFO("In cells x: %d y: %d", x, y);
+
+        robot_msgs::detectedObject temp = obj_msg;
+        temp.position.x = tf_object.point.x;
+        temp.position.y = tf_object.point.y;
+        detected_objects.push_back(temp);
 
         visualization_msgs::Marker object;
         object.header.frame_id = "map";
@@ -243,9 +240,7 @@ public:
 
         final_map[x_object_cell+width_map*y_object_cell] = 110;
 
-        object_publisher.publish( object );
-
-        //robot_msgs::detectedObject object;
+        //object_publisher.publish( object );
 
     }
 
@@ -461,22 +456,25 @@ public:
 
         visualization_msgs::Marker marker;
 
+        //ROS_INFO("Number of objects %d", detected_objects.size());
         if (detected_objects.size() != 0) {
             marker.header.frame_id = "map";
             for (std::vector<robot_msgs::detectedObject>::iterator it = detected_objects.begin(); it != detected_objects.end(); ++it) {
+                //ROS_INFO("Inside of object visualization");
+                robot_msgs::detectedObject temp = *it;
                 marker.header.stamp = ros::Time();
-                marker.ns = "my_namespace";
+                marker.ns = temp.object_id;
                 marker.id = 0;
                 marker.type = visualization_msgs::Marker::SPHERE;
                 marker.action = visualization_msgs::Marker::ADD;
-                marker.pose.position.x = 1;
-                marker.pose.position.y = 1;
-                marker.pose.position.z = 1;
+                marker.pose.position.x = temp.position.x;
+                marker.pose.position.y = temp.position.y;
+                marker.pose.position.z = 0;
                 marker.pose.orientation.x = 0.0;
                 marker.pose.orientation.y = 0.0;
                 marker.pose.orientation.z = 0.0;
                 marker.pose.orientation.w = 1.0;
-                marker.scale.x = 1;
+                marker.scale.x = 0.1;
                 marker.scale.y = 0.1;
                 marker.scale.z = 0.1;
                 marker.color.a = 1.0;
@@ -518,15 +516,26 @@ public:
 
     bool checkObjectInMap(robot_msgs::checkObjectInMap::Request &req, robot_msgs::checkObjectInMap::Response &res) {
         int width = 16;
-	int x = floor((center_x + req.point.x)/resolution);
-	int y = floor((center_y + req.point.y)/resolution);
 
+        geometry_msgs::PointStamped tf_object, obj;
+        obj.point.x = req.point.x;
+        obj.point.y = req.point.y;
+        obj.header.frame_id = "camera";
+        listener.waitForTransform("/camera", "/map", ros::Time(0), ros::Duration(1));
+        listener.transformPoint("map", obj, tf_object);
+
+        int x = floor(tf_object.point.x/resolution);
+        int y = floor(tf_object.point.y/resolution);
+
+        //ROS_INFO("COORDINATE OBJECT x: %d y: %d", x, y);
         for(int i = x-width/2; i <= x+width/2; i++)
         {
+            //ROS_INFO("CHECK COORDINATE OBJECT x: %d", i);
+
             for(int j = y-width/2; j <= y+width/2; j++)
             {
-
-                if(final_map[i + width_map*j] == 110)
+                //ROS_INFO("Value %d", final_map[i + width_map*j]);
+                if(final_map[i + width_map*j] == -106)
                 {
                     res.inMap = true;
                     return true;
@@ -576,6 +585,7 @@ int main(int argc, char **argv)
     {
         ros::spinOnce();
         map.gridVisualize();
+        map.objectVisualize();
         loop_rate.sleep();
     }
 
