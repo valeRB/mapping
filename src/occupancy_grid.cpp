@@ -527,14 +527,14 @@ public:
         int x = floor(tf_object.point.x/resolution);
         int y = floor(tf_object.point.y/resolution);
 
-        ROS_INFO("COORDINATE OBJECT x: %d y: %d", x, y);
+        //ROS_INFO("COORDINATE OBJECT x: %d y: %d", x, y);
         for(int i = x-width/2; i <= x+width/2; i++)
         {
-            ROS_INFO("CHECK COORDINATE OBJECT x: %d", i);
+            //ROS_INFO("CHECK COORDINATE OBJECT x: %d", i);
 
             for(int j = y-width/2; j <= y+width/2; j++)
             {
-                ROS_INFO("Value %d", final_map[i + width_map*j]);
+                //ROS_INFO("Value %d", final_map[i + width_map*j]);
                 if(final_map[i + width_map*j] == -106)
                 {
                     res.inMap = true;
