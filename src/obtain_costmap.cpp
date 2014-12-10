@@ -21,6 +21,7 @@ public:
     std::vector<signed char> costMap_vector;
     int width_robot, height_robot;
     int max, min;
+    int flag;
     createCostMap()
     {
         n = ros::NodeHandle();
@@ -37,6 +38,7 @@ public:
         //occupGrid_Map = map_msg;
         costMap_init();
         CostMapCreation();
+        flag = 0;
     }
 
     void getMap()
@@ -85,26 +87,28 @@ public:
     void CostMapCreation()
     {
         int width_map = costMap.info.width;
-        ROS_INFO("%d", width_map);
+        ROS_INFO("width_map: %d", width_map);
         for(int m = 0; m < width_map; m++)
         {
             for(int n = 0; n < width_map; n++)
             {
-                if(occupGrid_Map.data[m+width_map*n] == -106)
-                {
-                    costMapUpdate(m,n);
-                }
-                if(occupGrid_Map.data[m+width_map*n] == 0)
-                {
+                if(occupGrid_Map.data[m+width_map*n] == 0 || occupGrid_Map.data[m+width_map*n] == 110)
                     if(costMap_vector[m+width_map*n]!=150)
                     {
                         costMap_vector[m+width_map*n] = 0;
                     }
+            }
+
+        }
+        for(int m = 0; m < width_map; m++)
+        {
+            for(int n = 0; n < width_map; n++)
+            {
+
+                if(occupGrid_Map.data[m+width_map*n] == -106)
+                {
+                    costMapUpdate(m,n);
                 }
-                if (occupGrid_Map.data[m+width_map*n]>max)
-                    max = occupGrid_Map.data[m+width_map*n];
-                if (occupGrid_Map.data[m+width_map*n]<min)
-                    min = occupGrid_Map.data[m+width_map*n];
             }
             costMap.data = costMap_vector;
         }
@@ -128,8 +132,7 @@ public:
         {
             for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
             {
-                if(costMap_vector[i+costMap.info.width*j]!=150)
-                    costMap_vector[i+costMap.info.width*j] = 150;
+                costMap_vector[i+costMap.info.width*j] = 150;
             }
         }
     }
