@@ -20,6 +20,7 @@ public:
     nav_msgs::OccupancyGrid occupGrid_Map, costMap;
     std::vector<signed char> costMap_vector;
     int width_robot, height_robot;
+    int max, min;
     createCostMap()
     {
         n = ros::NodeHandle();
@@ -28,7 +29,6 @@ public:
     {}
     void init()
     {
-        // Subscribers:
      //   costMapEnable_subscriber = n.subscribe("/enableCostMap",1, &createCostMap::enableCostCallback, this);
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         occupGrid_Map_publisher = n.advertise<nav_msgs::OccupancyGrid>("/occupGridmap", 1);
@@ -37,14 +37,11 @@ public:
         //occupGrid_Map = map_msg;
         costMap_init();
         CostMapCreation();
-        // Publishers:
-
     }
 
     void getMap()
     {
         rosbag::Bag bag;
-        //bag.open("/home/ras/.ros/map_test_2.bag", rosbag::bagmode::Read);
         bag.open("/home/ras/catkin_ws/src/mapping/bagfiles/good_map_test.bag", rosbag::bagmode::Read);
         rosbag::View view(bag, rosbag::TopicQuery("/gridmap"));
         BOOST_FOREACH(rosbag::MessageInstance const m, view)
@@ -84,6 +81,7 @@ public:
         width_robot = 10;
         height_robot = 10;
     }
+
     void CostMapCreation()
     {
         int width_map = costMap.info.width;
@@ -98,17 +96,24 @@ public:
                 }
                 if(occupGrid_Map.data[m+width_map*n] == 0)
                 {
-                    if(costMap_vector[m+width_map*n]!=100)
+                    if(costMap_vector[m+width_map*n]!=150)
+                    {
                         costMap_vector[m+width_map*n] = 0;
+                    }
                 }
+                if (occupGrid_Map.data[m+width_map*n]>max)
+                    max = occupGrid_Map.data[m+width_map*n];
+                if (occupGrid_Map.data[m+width_map*n]<min)
+                    min = occupGrid_Map.data[m+width_map*n];
             }
+            costMap.data = costMap_vector;
         }
-        costMap.data = costMap_vector;
+    }
 
        // costMap_publisher.publish(costMap);
 
     //    enableCostMap.data = false;
-    }
+
     void publishoccupGrid_Map()
     {
         occupGrid_Map_publisher.publish(occupGrid_Map);
@@ -123,8 +128,8 @@ public:
         {
             for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
             {
-                if(costMap_vector[i+costMap.info.width*j]!=100)
-                    costMap_vector[i+costMap.info.width*j] = 100;
+                if(costMap_vector[i+costMap.info.width*j]!=150)
+                    costMap_vector[i+costMap.info.width*j] = 150;
             }
         }
     }
