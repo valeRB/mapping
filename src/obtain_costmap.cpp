@@ -32,8 +32,8 @@ public:
     {
      //   costMapEnable_subscriber = n.subscribe("/enableCostMap",1, &createCostMap::enableCostCallback, this);
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
-        occupGrid_Map_publisher = n.advertise<nav_msgs::OccupancyGrid>("/occupGridmap", 1);
-        // map_subscriber = n.subscribe("/gridmap", 1, &createCostMap::mapCallback,this);
+        occupGrid_Map_publisher = n.advertise<nav_msgs::OccupancyGrid>("/gridmap", 1);
+
         getMap();
         //occupGrid_Map = map_msg;
         costMap_init();
@@ -44,7 +44,7 @@ public:
     void getMap()
     {
         rosbag::Bag bag;
-        bag.open("/home/ras/catkin_ws/src/mapping/bagfiles/good_map_test.bag", rosbag::bagmode::Read);
+        bag.open("/home/ras/catkin_ws/src/mapping/bagfiles/map_test_2top.bag", rosbag::bagmode::Read);
         rosbag::View view(bag, rosbag::TopicQuery("/gridmap"));
         BOOST_FOREACH(rosbag::MessageInstance const m, view)
         {
@@ -87,13 +87,13 @@ public:
     void CostMapCreation()
     {
         int width_map = costMap.info.width;
-        ROS_INFO("width_map: %d", width_map);
+//        ROS_INFO("width_map: %d", width_map);
         for(int m = 0; m < width_map; m++)
         {
             for(int n = 0; n < width_map; n++)
             {
                 if(occupGrid_Map.data[m+width_map*n] == 0 || occupGrid_Map.data[m+width_map*n] == 110)
-                    if(costMap_vector[m+width_map*n]!=150)
+                    if(costMap_vector[m+width_map*n]!=100)
                     {
                         costMap_vector[m+width_map*n] = 0;
                     }
@@ -132,7 +132,7 @@ public:
         {
             for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
             {
-                costMap_vector[i+costMap.info.width*j] = 150;
+                costMap_vector[i+costMap.info.width*j] = 100;
             }
         }
     }
