@@ -573,8 +573,10 @@ void save_maps(int sig)
     nav_msgs::OccupancyGrid msg = _map->get_map();
     std::vector<robot_msgs::detectedObject> obj = _map->getObjects();
     bag.write("/gridmap", ros::Time::now(), msg);
-    for(int i = 0; i <= obj.size(); i++)
+    for(int i = 0; i <= obj.size(); i++){
+        std::cout<<"Saving objects";
         bag.write("/allObjects", ros::Time::now(), obj[i]);
+    }
     bag.close();
     ros::shutdown();
 }
