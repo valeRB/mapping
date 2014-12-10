@@ -31,6 +31,7 @@ public:
     ros::Publisher pose_publisher;
     ros::Publisher object_publisher;
     ros::Publisher costMap_publisher;
+    ros::Publisher allObjects_publisher;
     double x_t, y_t, theta_t;
     int width_map, height_map;
     double resolution, center_x, center_y;
@@ -69,6 +70,7 @@ public:
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
+        allObjects_publisher = n.advertise<std::vector<robot_msgs::detectedObject>("/allObjects", 1);
         service = n.advertiseService("/object_in_map", &OccupancyGrid::checkObjectInMap, this);
     }
 
@@ -168,6 +170,7 @@ public:
         temp.position.x = tf_object.point.x;
         temp.position.y = tf_object.point.y;
         detected_objects.push_back(temp);
+        allObjects_publisher.publish(detected_objects);
 
         visualization_msgs::Marker object;
         object.header.frame_id = "map";
@@ -506,6 +509,11 @@ public:
     {
         grid_msg.data = final_map;
         return grid_msg;
+    }
+
+    std::vector<robot_msgs::checkObjectInMap> getObjects()
+    {
+        return detected_objects;
     }
 
     nav_msgs::OccupancyGrid get_costMap()
