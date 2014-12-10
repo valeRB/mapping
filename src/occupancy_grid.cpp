@@ -44,6 +44,7 @@ public:
     tf::TransformListener listener;
     nav_msgs::OccupancyGrid grid_msg;
     std::vector<signed char> map_vector, final_map, cost_map;
+    std::vector<robot_msgs::detectedObject> detected_objects;
 
     OccupancyGrid()
     {
@@ -70,7 +71,7 @@ public:
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
         pose_publisher = n.advertise<geometry_msgs::PoseStamped>("/map/pose", 1);
         object_publisher = n.advertise<visualization_msgs::Marker>("/map/object", 1);
-        allObjects_publisher = n.advertise<std::vector<robot_msgs::detectedObject>("/allObjects", 1);
+        //allObjects_publisher = n.advertise<std::vector<robot_msgs::detectedObject> >("/allObjects", 1);
         service = n.advertiseService("/object_in_map", &OccupancyGrid::checkObjectInMap, this);
     }
 
@@ -170,7 +171,7 @@ public:
         temp.position.x = tf_object.point.x;
         temp.position.y = tf_object.point.y;
         detected_objects.push_back(temp);
-        allObjects_publisher.publish(detected_objects);
+        //allObjects_publisher.publish(detected_objects);
 
         visualization_msgs::Marker object;
         object.header.frame_id = "map";
@@ -511,7 +512,7 @@ public:
         return grid_msg;
     }
 
-    std::vector<robot_msgs::checkObjectInMap> getObjects()
+    std::vector<robot_msgs::detectedObject> getObjects()
     {
         return detected_objects;
     }
@@ -558,7 +559,7 @@ public:
 private:
 
     //OccupancyGrid *occupancy_grid_;
-    std::vector<robot_msgs::detectedObject> detected_objects;
+
     ros::ServiceServer service;
 };
 
@@ -570,12 +571,13 @@ void save_maps(int sig)
     rosbag::Bag bag;
     bag.open("map_test_2.bag", rosbag::bagmode::Write);
     nav_msgs::OccupancyGrid msg = _map->get_map();
+    std::vector<robot_msgs::detectedObject> obj = _map->getObjects();
     bag.write("/gridmap", ros::Time::now(), msg);
+    for(int i = 0; i <= obj.size(); i++)
+        bag.write("/allObjects", ros::Time::now(), obj[i]);
     bag.close();
     ros::shutdown();
 }
-
-
 
 int main(int argc, char **argv)
 {
