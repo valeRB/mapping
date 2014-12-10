@@ -93,7 +93,7 @@ public:
             for(int n = 0; n < width_map; n++)
             {
                 if(occupGrid_Map.data[m+width_map*n] == 0 || occupGrid_Map.data[m+width_map*n] == 110)
-                    if(costMap_vector[m+width_map*n]!=150)
+                    if(costMap_vector[m+width_map*n]!=100)
                     {
                         costMap_vector[m+width_map*n] = 0;
                     }
@@ -132,7 +132,7 @@ public:
         {
             for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
             {
-                costMap_vector[i+costMap.info.width*j] = 150;
+                costMap_vector[i+costMap.info.width*j] = 100;
             }
         }
     }
