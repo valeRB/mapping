@@ -524,7 +524,7 @@ public:
     }
 
     bool checkObjectInMap(robot_msgs::checkObjectInMap::Request &req, robot_msgs::checkObjectInMap::Response &res) {
-        int width = 16;
+        int width = 20;
 
         geometry_msgs::PointStamped tf_object, obj;
         obj.point.x = req.point.x;
