@@ -535,7 +535,7 @@ public:
             for(int j = y-width/2; j <= y+width/2; j++)
             {
                 //ROS_INFO("Value %d", final_map[i + width_map*j]);
-                if(final_map[i + width_map*j] == -106)
+                if(final_map[i + width_map*j] == 110)
                 {
                     res.inMap = true;
                     return true;

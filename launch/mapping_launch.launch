@@ -5,7 +5,7 @@
    
     <node pkg="transforms" type="ir_transform_node" name="ir_transform" output="screen" />
 
-    <!--<include file="$(find transforms)/launch/transforms_launch.launch" /> -->
+    <include file="$(find transforms)/launch/transforms_launch.launch" />
 
 
 </launch>
