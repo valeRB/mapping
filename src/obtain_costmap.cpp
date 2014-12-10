@@ -7,7 +7,7 @@
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
-std_msgs::Bool enableCostMap;
+//std_msgs::Bool enableCostMap;
 class createCostMap
 {
 public:
@@ -15,6 +15,7 @@ public:
     ros::Subscriber map_subscriber;
     ros::Subscriber costMapEnable_subscriber;
     ros::Publisher costMap_publisher;
+    ros::Publisher occupGrid_Map_publisher;
     nav_msgs::OccupancyGrid::ConstPtr map_msg, costmap_msg;
     nav_msgs::OccupancyGrid occupGrid_Map, costMap;
     std::vector<signed char> costMap_vector;
@@ -28,8 +29,9 @@ public:
     void init()
     {
         // Subscribers:
-        costMapEnable_subscriber = n.subscribe("/enableCostMap",1, &createCostMap::enableCostCallback, this);
+     //   costMapEnable_subscriber = n.subscribe("/enableCostMap",1, &createCostMap::enableCostCallback, this);
         costMap_publisher = n.advertise<nav_msgs::OccupancyGrid>("/costmap", 1);
+        occupGrid_Map_publisher = n.advertise<nav_msgs::OccupancyGrid>("/occupGridmap", 1);
         // map_subscriber = n.subscribe("/gridmap", 1, &createCostMap::mapCallback,this);
         getMap();
         //occupGrid_Map = map_msg;
@@ -62,10 +64,10 @@ public:
         bag.close();
     }
 
-    void enableCostCallback(const std_msgs::Bool &enable_msg)
-    {
-        enableCostMap = enable_msg;
-    }
+ //   void enableCostCallback(const std_msgs::Bool &enable_msg)
+ //   {
+  //      enableCostMap = enable_msg;
+  //  }
 
     void costMap_init()
     {
@@ -90,7 +92,7 @@ public:
         {
             for(int n = 0; n < width_map; n++)
             {
-                if(occupGrid_Map.data[m+width_map*n] == 150)
+                if(occupGrid_Map.data[m+width_map*n] == -106)
                 {
                     costMapUpdate(m,n);
                 }
@@ -105,7 +107,11 @@ public:
 
        // costMap_publisher.publish(costMap);
 
-        enableCostMap.data = false;
+    //    enableCostMap.data = false;
+    }
+    void publishoccupGrid_Map()
+    {
+        occupGrid_Map_publisher.publish(occupGrid_Map);
     }
     void publishcostmap()
     {
@@ -137,7 +143,7 @@ int main(int argc, char **argv)
     {
         ros::spinOnce();
         map.publishcostmap();
-
+        map.publishoccupGrid_Map();
         loop_rate.sleep();
     }
     return 0;
