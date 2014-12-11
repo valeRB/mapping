@@ -78,68 +78,70 @@ public:
 
     void odometryCallback(const ras_arduino_msgs::Odometry::ConstPtr &pose_msg)
     {
-        x_t = pose_msg->x;
-        y_t = pose_msg->y;
-        theta_t = pose_msg->theta;
-        // 1. Update map every time we move to another cell
-        x_pose_cell_map = floor((center_x + x_t)/resolution);
-        y_pose_cell_map = floor((center_y + y_t)/resolution);
-        // Initial values of previous values != than zero
-
-        if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
+        if(mapping_done.data == false)
         {
-            for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
+            x_t = pose_msg->x;
+            y_t = pose_msg->y;
+            theta_t = pose_msg->theta;
+            // 1. Update map every time we move to another cell
+            x_pose_cell_map = floor((center_x + x_t)/resolution);
+            y_pose_cell_map = floor((center_y + y_t)/resolution);
+            // Initial values of previous values != than zero
+
+            if((prev_x_pose_cell != x_pose_cell_map) || (prev_y_pose_cell != y_pose_cell_map))
             {
-                for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
+                for(int i = x_pose_cell_map-(width_robot/2); i <= (x_pose_cell_map+(width_robot/2)); i++)
                 {
-
-                    if(cost_map[i + width_map*j] == 100)
+                    for(int j = y_pose_cell_map-floor(height_robot/2); j <= (y_pose_cell_map+floor(height_robot/2)); j++)
                     {
-                        costMapUpdate(i, j, 0);
+
+                        if(cost_map[i + width_map*j] == 100)
+                        {
+                            costMapUpdate(i, j, 0);
+                        }
+                        map_vector[i+width_map*j] = 1;
+
                     }
-                    map_vector[i+width_map*j] = 1;
-
                 }
+                prev_x_pose_cell = x_pose_cell_map;
+                prev_y_pose_cell = y_pose_cell_map;
             }
-            prev_x_pose_cell = x_pose_cell_map;
-            prev_y_pose_cell = y_pose_cell_map;
+
+            if(sensor_msg.s1 == true)
+            {
+                mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
+            }
+
+            if(sensor_msg.s2 == true)
+            {
+                mapUpdate(sensor_msg.p2.point.x,sensor_msg.p2.point.y,2);
+            }
+
+            if(sensor_msg.s3 == true)
+            {
+                mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
+            }
+
+            if(sensor_msg.s4 == true)
+            {
+                mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
+            }
+
+
+
+            //In case we want to view our direction
+            //Publish pose for visualization
+            geometry_msgs::PoseStamped poseStamp_msg;
+            poseStamp_msg.header.frame_id = "robot_center";
+            poseStamp_msg.header.stamp = ros::Time(0);
+            poseStamp_msg.pose.position.x = 0;
+            poseStamp_msg.pose.position.y = 0;
+            poseStamp_msg.pose.position.z = 0;
+            tf::Quaternion q;
+            q.setEuler(0.0, 0.0, M_PI_2);
+            tf::quaternionTFToMsg(q, poseStamp_msg.pose.orientation);
+            pose_publisher.publish(poseStamp_msg);
         }
-
-        if(sensor_msg.s1 == true)
-        {
-            mapUpdate(sensor_msg.p1.point.x,sensor_msg.p1.point.y,1);
-        }
-
-        if(sensor_msg.s2 == true)
-        {
-            mapUpdate(sensor_msg.p2.point.x,sensor_msg.p2.point.y,2);
-        }
-
-        if(sensor_msg.s3 == true)
-        {
-            mapUpdate(sensor_msg.p3.point.x,sensor_msg.p3.point.y,3);
-        }
-
-        if(sensor_msg.s4 == true)
-        {
-            mapUpdate(sensor_msg.p4.point.x,sensor_msg.p4.point.y,4);
-        }
-
-
-
-        //In case we want to view our direction
-        //Publish pose for visualization
-        geometry_msgs::PoseStamped poseStamp_msg;
-        poseStamp_msg.header.frame_id = "robot_center";
-        poseStamp_msg.header.stamp = ros::Time(0);
-        poseStamp_msg.pose.position.x = 0;
-        poseStamp_msg.pose.position.y = 0;
-        poseStamp_msg.pose.position.z = 0;
-        tf::Quaternion q;
-        q.setEuler(0.0, 0.0, M_PI_2);
-        tf::quaternionTFToMsg(q, poseStamp_msg.pose.orientation);
-        pose_publisher.publish(poseStamp_msg);
-
         // Estimate cells to update here
 
     }
@@ -469,7 +471,58 @@ public:
                 marker.header.stamp = ros::Time();
                 marker.ns = temp.object_id;
                 marker.id = 0;
-                marker.type = visualization_msgs::Marker::SPHERE;
+
+                if (temp.object_id == "greencube") {
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 0;
+                    marker.color.g = 1.0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "greencylinder") {
+                    marker.type = visualization_msgs::Marker::CYLINDER;
+                    marker.color.a = 1.0;
+                    marker.color.r = 0;
+                    marker.color.g = 1.0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "redball") {
+                    marker.type = visualization_msgs::Marker::SPHERE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 1.0;
+                    marker.color.g = 0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "redcube") {
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 1.0;
+                    marker.color.g = 0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "bluecube") {
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 0;
+                    marker.color.g = 0;
+                    marker.color.b = 1.0;
+                } else if (temp.object_id == "yellowcube") {
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 1.0;
+                    marker.color.g = 1.0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "yellowball") {
+                    marker.type = visualization_msgs::Marker::SPHERE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 1.0;
+                    marker.color.g = 1.0;
+                    marker.color.b = 0;
+                } else if (temp.object_id == "purplecross"){
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.color.a = 1.0;
+                    marker.color.r = 1.0;
+                    marker.color.g = 0;
+                    marker.color.b = 1.0;
+                }
+
+                //marker.type = visualization_msgs::Marker::SPHERE;
                 marker.action = visualization_msgs::Marker::ADD;
                 marker.pose.position.x = temp.position.x;
                 marker.pose.position.y = temp.position.y;
@@ -481,10 +534,10 @@ public:
                 marker.scale.x = 0.1;
                 marker.scale.y = 0.1;
                 marker.scale.z = 0.1;
-                marker.color.a = 1.0;
-                marker.color.r = 0.0;
-                marker.color.g = 1.0;
-                marker.color.b = 0.0;
+                //marker.color.a = 1.0;
+                //marker.color.r = 0.0;
+                //marker.color.g = 1.0;
+                //marker.color.b = 0.0;
 
                 object_publisher.publish(marker);
             }
