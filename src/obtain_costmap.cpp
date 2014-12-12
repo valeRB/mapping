@@ -44,7 +44,7 @@ public:
     void getMap()
     {
         rosbag::Bag bag;
-        bag.open("/home/ras/catkin_ws/src/mapping/bagfiles/map_test_2top.bag", rosbag::bagmode::Read);
+        bag.open("/home/ras/.ros/map_test_2.bag", rosbag::bagmode::Read);
         rosbag::View view(bag, rosbag::TopicQuery("/gridmap"));
         BOOST_FOREACH(rosbag::MessageInstance const m, view)
         {
@@ -128,9 +128,9 @@ public:
     }
     void costMapUpdate(int x_1, int y_1)
     {
-        for(int i = x_1-(width_robot/2); i <= (x_1+(width_robot/2)); i++)
+        for(int i = x_1-(width_robot/2 + 1); i <= (x_1+(width_robot/2 + 1)); i++)
         {
-            for(int j = y_1-(height_robot/2); j <= (y_1+(height_robot/2)); j++)
+            for(int j = y_1-(height_robot/2 + 1); j <= (y_1+(height_robot/2 + 1)); j++)
             {
                 costMap_vector[i+costMap.info.width*j] = 100;
             }
